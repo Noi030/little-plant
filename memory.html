@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<title>記憶翻牌</title>
+
+<style>
+body {
+    min-height: 100vh;
+    margin: 0;
+    font-family: Arial, sans-serif;
+    text-align: center;
+    background: linear-gradient(135deg, #f5d9ff, #cfe9ff); /* 粉藍漸層 */
+}
+
+h1 {
+    color: #1f3a8a; /* 深藍色 */
+    margin-top: 30px;
+}
+
+/* 重新開始按鈕 */
+button {
+    margin: 15px 0 25px;
+    padding: 10px 25px;
+    font-size: 18px;
+    border: none;
+    border-radius: 20px;
+    background: #4f7cff;
+    color: white;
+    cursor: pointer;
+}
+
+button:hover {
+    background: #355edc;
+}
+
+/* 遊戲區 */
+.game {
+    width: 520px;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 20px;
+    perspective: 1200px;
+}
+
+/* 卡片 */
+.card {
+    width: 110px;
+    height: 150px; /* 長方形 */
+    position: relative;
+    transform-style: preserve-3d;
+    transition: transform 0.6s;
+    cursor: pointer;
+}
+
+.card.flipped {
+    transform: rotateY(180deg);
+}
+
+.card.matched {
+    cursor: default;
+}
+
+/* 正反面 */
+.card-face {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    border-radius: 15px;
+    backface-visibility: hidden;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+/* 背面（已拿掉問號） */
+.card-back {
+    background: linear-gradient(135deg, #4f7cff, #7fb0ff);
+}
+
+
+/* 正面（圖片） */
+.card-front {
+    background: white;
+    transform: rotateY(180deg);
+}
+
+.card-front img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 10px;
+}
+
+/* 彈窗背景 */
+.modal {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.4);
+    display: none;
+    justify-content: center;
+    align-items: center;
+    z-index: 999;
+}
+
+/* 彈窗本體 */
+.modal-content {
+    background: white;
+    padding: 30px 40px;
+    border-radius: 20px;
+    text-align: center;
+    width: 320px;
+    
+}
+
+.modal-content h2 {
+    color: #1f3a8a;
+    margin-bottom: 10px;
+}
+
+/* 按鈕群 */
+.modal-buttons {
+    margin-top: 20px;
+    display: flex;
+    justify-content: center;
+    gap: 15px;
+}
+
+.modal-buttons button {
+    padding: 10px 18px;
+    font-size: 16px;
+    border: none;
+    border-radius: 20px;
+    cursor: pointer;
+    background: #4f7cff;
+    color: white;
+}
+
+.modal-buttons button:hover {
+    background: #355edc;
+}
+
+/* 返回按鈕不同色 */
+.back-btn {
+    background: #9aa4b2;
+}
+
+.back-btn:hover {
+    background: #6b7280;
+}
+
+.info {
+    margin-bottom: 15px;
+    font-size: 18px;
+    color: #1f3a8a;
+}
+
+</style>
+</head>
+
+<body>
+
+<h1>記憶翻牌</h1>
+<button onclick="restartGame()">重新開始</button>
+<div class="info">
+    ⏱ <span id="time">0</span> 秒　
+    👣 <span id="step">0</span> 步　
+    🏆 最佳：<span id="best">--</span>
+</div>
+
+
+<div class="game" id="game"></div>
+
+<script>
+let startTime = 0;
+let timer = null;
+let steps = 0;
+let bestRecord = localStorage.getItem('memoryBest');
+
+if (bestRecord) {
+    document.getElementById('best').innerText = bestRecord;
+}
+
+const images = [
+    'img/1.png','img/2.png','img/3.png',
+    'img/4.png','img/5.png','img/6.png',
+    'img/1.png','img/2.png','img/3.png',
+    'img/4.png','img/5.png','img/6.png'
+];
+
+let firstCard = null;
+let secondCard = null;
+let lockBoard = false;
+let matchedCount = 0;
+
+const game = document.getElementById('game');
+
+function shuffle(array) {
+    return array.sort(() => 0.5 - Math.random());
+}
+
+function createGame() {
+    game.innerHTML = '';
+    matchedCount = 0;
+    shuffle(images);
+
+    images.forEach(src => {
+        const card = document.createElement('div');
+        card.classList.add('card');
+
+        card.innerHTML = `
+            <div class="card-face card-back"></div>
+            <div class="card-face card-front">
+                <img src="${src}">
+            </div>
+        `;
+
+        card.addEventListener('click', () => {
+            if (lockBoard || card.classList.contains('flipped')) return;
+
+            // 計時器
+            if (startTime === 0) {
+                startTime = Date.now();
+                timer = setInterval(() => {
+                    const now = Math.floor((Date.now() - startTime) / 1000);
+                    document.getElementById('time').innerText = now;
+                }, 1000);
+            }
+
+            card.classList.add('flipped');
+
+            if (!firstCard) {
+                firstCard = card;
+            } else {
+                secondCard = card;
+                lockBoard = true;
+                steps++;
+                document.getElementById('step').innerText = steps;
+
+                const img1 = firstCard.querySelector('img').src;
+                const img2 = secondCard.querySelector('img').src;
+
+                if (img1 === img2) {
+                    firstCard.classList.add('matched');
+                    secondCard.classList.add('matched');
+                    matchedCount += 2;
+                    resetTurn();
+
+                    if (matchedCount === images.length) {
+                        clearInterval(timer);
+                        const timeSpent = Math.floor((Date.now() - startTime) / 1000);
+
+                        document.getElementById('resultText').innerText =
+                            `⏱ 花了 ${timeSpent} 秒 ｜ 👣 ${steps} 步`;
+
+                        // 更新最佳紀錄（用時間判定）
+                        if (!bestRecord || timeSpent < parseInt(bestRecord)) {
+                            bestRecord = timeSpent;
+                            localStorage.setItem('memoryBest', bestRecord);
+                            document.getElementById('best').innerText = bestRecord;
+                        }
+
+                        setTimeout(showFinishModal, 500);
+                    }
+
+                } else {
+                    setTimeout(() => {
+                        firstCard.classList.remove('flipped');
+                        secondCard.classList.remove('flipped');
+                        resetTurn();
+                    }, 1000);
+                }
+            }
+        });
+
+        game.appendChild(card);
+    });
+}
+
+function resetTurn() {
+    firstCard = null;
+    secondCard = null;
+    lockBoard = false;
+}
+
+function restartGame() {
+    resetTurn();
+    clearInterval(timer);
+    startTime = 0;
+    steps = 0;
+    document.getElementById('time').innerText = 0;
+    document.getElementById('step').innerText = 0;
+    createGame();
+}
+
+// 彈窗控制
+function showFinishModal() {
+    document.getElementById('finishModal').style.display = 'flex';
+}
+function hideFinishModal() {
+    document.getElementById('finishModal').style.display = 'none';
+}
+function restartFromModal() {
+    hideFinishModal();
+    restartGame();
+}
+function goBack() {
+    window.location.href = 'litle.html'; // 改成你的小遊戲頁
+}
+
+createGame();
+
+</script>
+
+<!-- 完成彈窗 -->
+<div class="modal" id="finishModal" onclick="hideFinishModal()">
+    <div class="modal-content">
+        <h2>恭喜完成！</h2>
+        <p>你配對完了所有卡片</p>
+        <p id="resultText" style="margin-top:10px; color:#4f3775;"></p>
+        <div class="modal-buttons">
+            <button onclick="restartFromModal()">重新開始</button>
+            <button class="back-btn" onclick="goBack()">返回小遊戲們</button>
+        </div>
+    </div>
+</div>
+
+
+</body>
+</html>

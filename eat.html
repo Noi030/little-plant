@@ -1,0 +1,441 @@
+<!--我在使用visual stdio code製作網頁，我想要-->
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<title>貪吃蛇遊戲</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<style>
+    body {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+        margin: 0;
+        background: linear-gradient(135deg, #f5d9ff, #cfe9ff);
+        font-family: Arial, sans-serif;
+        color: white;
+    }
+    canvas {
+        background: radial-gradient(circle, #ffffff 0%, #ffffff 100%);
+        box-shadow: 0 0 20px rgb(165, 102, 246);
+        border-radius: 10px;
+    }
+    #scoreBoard {
+    position: absolute;
+    top: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 24px;
+    font-weight: bold;
+    text-shadow: 0 0 5px rgb(14, 39, 129);
+    color: white;
+}
+
+#highScoreBoard {
+    position: absolute;
+    top: 45px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 18px;
+    font-weight: bold;
+    text-shadow: 0 0 5px rgb(14, 39, 129);
+    color: #fdefa0;
+}
+
+
+    #gameOverScreen {
+    position: absolute;
+    text-align: center;
+    padding: 30px 50px;
+    border-radius: 15px;
+
+    background: linear-gradient(135deg, #f5d9ff, #cfe9ff);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+
+    border: 1px solid rgba(255,255,255,0.4);
+    box-shadow: 0 8px 32px rgba(31, 38, 135, 0.37);
+}
+
+
+
+#gameOverScreen h1 {
+    color: rgb(225, 98, 98);
+    margin-bottom: 10px;
+}
+
+#gameOverScreen button {
+    padding: 10px 25px;
+    font-size: 18px;
+    cursor: pointer;
+    border: none;
+    border-radius: 8px;
+    background: rgb(149, 155, 239);
+}
+
+#controls {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: none; /* 預設電腦不顯示 */
+    text-align: center;
+    z-index: 100;
+}
+
+#controls button {
+    width: 60px;
+    height: 60px;
+    margin: 5px;
+    font-size: 24px;
+    border-radius: 50%;
+    border: none;
+    background: rgb(195, 137, 245);
+    color: rgb(255, 255, 255);
+    box-shadow: 0 0 10px rgb(116, 52, 134);
+}
+
+#controls button:active {
+    transform: scale(0.9);
+    background: #d981e0;
+}
+
+@media (max-width: 768px) {
+    #controls {
+        display: block;
+    }
+}
+
+
+</style>
+</head>
+<body>
+
+<div id="scoreBoard">Score: 0</div>
+<div id="highScoreBoard">High Score: 0</div>
+<canvas id="game"></canvas>
+<div id="gameOverScreen" style="display:none;">
+    <h1>Game Over</h1>
+    <p id="finalScore"></p>
+
+    <button onclick="restartGame()">重新開始</button>
+    <br><br>
+    <button onclick="goHome()">回小遊戲們</button>
+</div>
+
+<div id="controls">
+    <button onclick="moveUp()">▲</button>
+    <div>
+        <button onclick="moveLeft()">◀</button>
+        <button onclick="moveDown()">▼</button>
+        <button onclick="moveRight()">▶</button>
+    </div>
+</div>
+
+
+<script>
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+const scoreBoard = document.getElementById("scoreBoard");
+const highScoreBoard = document.getElementById("highScoreBoard");
+let highScore = localStorage.getItem("snakeHighScore") || 0;
+
+highScoreBoard.textContent = "High Score: " + highScore;
+
+
+// 設定畫布大小
+function resizeCanvas() {
+    const size = Math.min(window.innerWidth, window.innerHeight) - 40;
+    canvas.width = size;
+    canvas.height = size;
+}
+resizeCanvas();
+window.addEventListener("resize", resizeCanvas);
+
+const grid = 25;  // 每格大小
+let snake = [{ x: 200, y: 200 }];
+let dx = grid;
+let dy = 0;
+
+let food = randomFood();
+let foodColor = randomColor();
+let speed = 15;     // 一開始慢一點
+let minSpeed = 5;  // 最高速限制
+let count = 0;
+let score = 0;
+
+let gameStarted = false;
+let paused = false;
+let blink = 0;
+
+// 隨機食物位置
+function randomFood() {
+    return {
+        x: Math.floor(Math.random() * (canvas.width / grid)) * grid,
+        y: Math.floor(Math.random() * (canvas.height / grid)) * grid
+    };
+}
+
+// 隨機顏色
+function randomColor() {
+    const hue = Math.floor(Math.random() * 360);
+    return `hsl(${hue}, 100%, 50%)`;
+}
+
+// 顯示開始畫面
+function drawStartScreen() {
+    // ⭐ 玻璃背景（假玻璃）
+ctx.fillStyle = "rgba(255, 255, 255, 0.15)";
+ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+
+    const boxWidth = canvas.width * 0.65;
+    const boxHeight = 120;
+    const x = (canvas.width - boxWidth) / 2;
+    const y = (canvas.height - boxHeight) / 2;
+
+    ctx.fillStyle = "rgba(255, 255, 255, 0.25)";
+    ctx.beginPath();
+    ctx.moveTo(x + 15, y);
+    ctx.lineTo(x + boxWidth - 15, y);
+    ctx.arcTo(x + boxWidth, y, x + boxWidth, y + boxHeight, 15);
+    ctx.lineTo(x + boxWidth, y + boxHeight - 15);
+    ctx.arcTo(x + boxWidth, y + boxHeight, x + boxWidth - 15, y + boxHeight, 15);
+    ctx.lineTo(x + 15, y + boxHeight);
+    ctx.arcTo(x, y + boxHeight, x, y + boxHeight - 15, 15);
+    ctx.lineTo(x, y + 15);
+    ctx.arcTo(x, y, x + 15, y, 15);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = "rgba(255,255,255,0.6)";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+
+    ctx.fillStyle = "rgba(31, 38, 135, 0.37)";
+ctx.shadowColor = "rgba(255,255,255,0.8)";
+ctx.shadowBlur = 10;
+    ctx.font = "bold 28px Arial";
+    ctx.textAlign = "center";
+    ctx.fillText("貪吃蛇", canvas.width / 2, y + 40);
+
+    ctx.fillStyle = "rgba(31, 38, 135, 0.37)";
+    ctx.font = "18px Arial";
+    ctx.fillText("點擊畫面或按空白鍵開始", canvas.width / 2, y + 70);
+    ctx.fillText("手機可用方向鍵操作", canvas.width / 2, y + 90);
+    ctx.fillText("按 P 鍵可暫停 / 繼續遊戲", canvas.width / 2, y + 110);
+}
+
+// 顯示分數
+function updateScore() {
+    scoreBoard.textContent = "Score: " + score;
+}
+
+// 畫暫停提示
+function drawPauseScreen() {
+    ctx.fillStyle = "rgba(0,0,0,0.6)";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    ctx.fillStyle = "yellow";
+    ctx.font = "bold 26px Arial";
+    ctx.textAlign = "center";
+    ctx.shadowColor = "yellow";
+    ctx.shadowBlur = 10;
+    ctx.fillText("遊戲暫停", canvas.width / 2, canvas.height / 2);
+
+    ctx.shadowBlur = 0;
+}
+
+
+function goHome() {
+    window.location.href = "litle.html"; // 改成你的首頁檔名
+}
+
+window.onload = function() {
+    // 網頁加載後立即顯示開始畫面
+    drawStartScreen();
+};
+
+// 重置遊戲
+function restartGame() {
+    snake = [{ x: 200, y: 200 }];
+    dx = grid;
+    dy = 0;
+    food = randomFood();
+    foodColor = randomColor();
+    speed = 12;
+    count = 0;
+    score = 0;
+    paused = false;
+    gameStarted = false;
+    scoreBoard.style.display = "block";  // 顯示分數
+    scoreBoard.textContent = "Score: 0";  // 顯示初始分數
+
+    document.getElementById("gameOverScreen").style.display = "none";
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    drawStartScreen();
+}
+
+// 遊戲循環
+function gameLoop() {
+    requestAnimationFrame(gameLoop);
+
+    if (!gameStarted) {
+    document.getElementById("scoreBoard").style.display = "none";  // 隱藏分數板
+    drawStartScreen();  // 顯示開始畫面
+    return;
+} else {
+    document.getElementById("scoreBoard").style.display = "block";  // 顯示分數板
+}
+
+    if (paused) {
+        drawPauseScreen();
+        return;
+    }
+
+    if (++count < speed) return;
+    count = 0;
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    let bg = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+bg.addColorStop(0, "#2b1055");
+bg.addColorStop(1, "#7597de");
+
+ctx.fillStyle = bg;
+ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+
+    // 移動蛇
+    const head = { x: snake[0].x + dx, y: snake[0].y + dy };
+    snake.unshift(head);
+
+    // 判斷是否吃到食物
+    if (head.x === food.x && head.y === food.y) {
+        food = randomFood();           // 生成新食物
+        foodColor = randomColor();     // 生成新食物顏色
+        score++;                       // 增加分數
+        updateScore();  // 更新分數
+        if (score > highScore) {
+    highScore = score;
+    localStorage.setItem("snakeHighScore", highScore);
+    highScoreBoard.textContent = "High Score: " + highScore;
+}
+
+
+        scoreBoard.textContent = "Score: " + score;  // 更新分數顯示
+
+        // 加速遊戲速度
+        if (speed > minSpeed) {
+    speed--;
+}
+    } else {
+        snake.pop();  // 移除蛇的尾巴，保持蛇長度
+    }
+
+    // 撞牆或撞自己，遊戲結束
+    if (
+        head.x < 0 || head.x >= canvas.width ||
+        head.y < 0 || head.y >= canvas.height ||
+        snake.slice(1).some(p => p.x === head.x && p.y === head.y)
+    ) {
+        gameStarted = false;
+        paused = true;
+        document.getElementById("finalScore").textContent =
+    "你的分數：" + score + "（最高分：" + highScore + "）";
+
+        document.getElementById("gameOverScreen").style.display = "block";
+        document.getElementById("scoreBoard").style.display = "none"; // 隱藏分數板
+        return;
+    }
+
+    // 畫食物（固定顏色）
+    blink = (blink + 1) % 20;
+    ctx.fillStyle = foodColor;
+    ctx.fillRect(food.x, food.y, grid, grid);
+
+    // 畫蛇（彩虹漸層）
+    for (let i = 0; i < snake.length; i++) {
+        let hue = (i * 360 / snake.length + Date.now() / 10) % 360; // 動態彩虹顏色
+        ctx.fillStyle = `hsl(${hue}, 100%, 50%)`;
+        ctx.fillRect(snake[i].x, snake[i].y, grid, grid);
+    }
+}
+
+
+
+requestAnimationFrame(gameLoop);
+
+// 控制鍵盤
+document.addEventListener("keydown", e => {
+    if (!gameStarted && e.code === "Space") {
+        gameStarted = true;
+        return;
+    }
+
+    if (e.key === "p" || e.key === "P") {
+        paused = !paused;
+        return;
+    }
+
+    if (e.key === "ArrowLeft" && dx === 0)  { dx = -grid; dy = 0; }
+    if (e.key === "ArrowUp" && dy === 0)    { dx = 0; dy = -grid; }
+    if (e.key === "ArrowRight" && dx === 0) { dx = grid; dy = 0; }
+    if (e.key === "ArrowDown" && dy === 0)  { dx = 0; dy = grid; }
+});
+
+// 觸摸控制
+let touchStartX = 0;
+let touchStartY = 0;
+
+canvas.addEventListener("touchend", e => {
+    const touch = e.changedTouches[0];
+    const dxTouch = touch.clientX - touchStartX;
+    const dyTouch = touch.clientY - touchStartY;
+
+    if (Math.abs(dxTouch) > Math.abs(dyTouch)) {
+        if (dxTouch > 30 && dx === 0) { dx = grid; dy = 0; }
+        if (dxTouch < -30 && dx === 0) { dx = -grid; dy = 0; }
+    } else {
+        if (dyTouch > 30 && dy === 0) { dx = 0; dy = grid; }
+        if (dyTouch < -30 && dy === 0) { dx = 0; dy = -grid; }
+    }
+});
+
+canvas.addEventListener("click", () => {
+    if (!gameStarted) gameStarted = true;
+});
+
+function moveUp() {
+    if (dy === 0) {
+        dx = 0;
+        dy = -grid;
+    }
+}
+
+function moveDown() {
+    if (dy === 0) {
+        dx = 0;
+        dy = grid;
+    }
+}
+
+function moveLeft() {
+    if (dx === 0) {
+        dx = -grid;
+        dy = 0;
+    }
+}
+
+function moveRight() {
+    if (dx === 0) {
+        dx = grid;
+        dy = 0;
+    }
+}
+
+</script>
+
+</body>
+</html>

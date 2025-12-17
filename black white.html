@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>五子棋</title>
+    <style>
+        body {
+            background: linear-gradient(135deg, #f5d9ff, #cfe9ff);
+            font-family: Arial, sans-serif;
+            text-align: center;
+            padding: 20px;
+        }
+
+        h1 {
+            color: #333;
+        }
+
+        #board {
+            display: grid;
+            grid-template-columns: repeat(15, 40px);
+            grid-template-rows: repeat(15, 40px);
+            gap: 2px;
+            justify-content: center;
+            margin-top: 20px;
+        }
+
+        .cell {
+            width: 40px;
+            height: 40px;
+            background-color: #f0f0f0;
+            border-radius: 5px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+        }
+
+        .cell.black {
+            background-color: #333;
+        }
+
+        .cell.white {
+            background-color: #fff;
+            border: 1px solid #333;
+        }
+
+        #status {
+            margin-top: 20px;
+        }
+
+        /* 原本的重新開始按鈕，如果需要也可以用 */
+        #restart-btn {
+            margin-top: 20px;
+            padding: 10px 20px;
+            font-size: 16px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            cursor: pointer;
+            border-radius: 20px; /* 圓角 */
+        }
+
+        #restart-btn:hover {
+            background-color: #0056b3;
+        }
+
+        /* 勝利彈窗 */
+        #win-popup {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: linear-gradient(135deg, #f5d9ff, #cfe9ff);
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.5);
+            z-index: 1000;
+        }
+
+        #win-popup button {
+            margin: 5px;
+            padding: 10px 20px;
+            border: none;
+            cursor: pointer;
+            border-radius: 20px; /* 圓角 */
+            font-size: 16px;
+        }
+
+        #restart-btn-popup {
+            background-color: #32b6b6;
+            color: white;
+        }
+
+        #restart-btn-popup:hover {
+            background-color: #239c92;
+        }
+
+        #back-to-games-btn {
+            background-color: #4874d9;
+            color: white;
+        }
+
+        #back-to-games-btn:hover {
+            background-color: #2851c2;
+        }
+    </style>
+</head>
+<body>
+    <h1 style="color: #5859a8;">五子棋遊戲</h1>
+    <div id="board"></div>
+    <div id="status">
+        <p>當前玩家：<span id="current-player">黑</span></p>
+    </div>
+
+    <!-- 勝利彈窗 -->
+    <div id="win-popup">
+        <p id="win-text"></p>
+        <button id="restart-btn-popup">重新開始遊戲</button>
+        <button id="back-to-games-btn">回到小遊戲畫面</button>
+    </div>
+
+    <script>
+        const boardSize = 15;
+        let currentPlayer = 'black'; // 先手是黑子
+        let board = Array(boardSize).fill().map(() => Array(boardSize).fill(null));
+
+        // 創建棋盤
+        function createBoard() {
+            const boardElement = document.getElementById('board');
+            boardElement.innerHTML = '';
+
+            for (let row = 0; row < boardSize; row++) {
+                for (let col = 0; col < boardSize; col++) {
+                    const cell = document.createElement('div');
+                    cell.classList.add('cell');
+                    cell.dataset.row = row;
+                    cell.dataset.col = col;
+
+                    cell.addEventListener('click', () => handleClick(row, col));
+                    boardElement.appendChild(cell);
+                }
+            }
+        }
+
+        // 點擊棋盤
+        function handleClick(row, col) {
+            if (board[row][col]) return;
+
+            board[row][col] = currentPlayer;
+            renderBoard();
+
+            if (checkWin(row, col)) {
+                showWinPopup(currentPlayer);
+            } else {
+                currentPlayer = currentPlayer === 'black' ? 'white' : 'black';
+                document.getElementById('current-player').textContent = currentPlayer === 'black' ? '黑' : '白';
+            }
+        }
+
+        // 渲染棋盤
+        function renderBoard() {
+            const boardElement = document.getElementById('board');
+            const cells = boardElement.getElementsByClassName('cell');
+
+            for (let row = 0; row < boardSize; row++) {
+                for (let col = 0; col < boardSize; col++) {
+                    const cell = cells[row * boardSize + col];
+                    if (board[row][col]) {
+                        cell.classList.add(board[row][col]);
+                    } else {
+                        cell.classList.remove('black', 'white');
+                    }
+                }
+            }
+        }
+
+        // 檢查勝利
+        function checkWin(row, col) {
+            const directions = [
+                { r: 0, c: 1 },
+                { r: 1, c: 0 },
+                { r: 1, c: 1 },
+                { r: 1, c: -1 }
+            ];
+
+            for (const dir of directions) {
+                let count = 1;
+                count += countDirection(row, col, dir.r, dir.c);
+                count += countDirection(row, col, -dir.r, -dir.c);
+                if (count >= 5) return true;
+            }
+
+            return false;
+        }
+
+        function countDirection(row, col, rDir, cDir) {
+            let count = 0;
+            const player = board[row][col];
+            let r = row + rDir;
+            let c = col + cDir;
+
+            while (r >= 0 && r < boardSize && c >= 0 && c < boardSize && board[r][c] === player) {
+                count++;
+                r += rDir;
+                c += cDir;
+            }
+            return count;
+        }
+
+        // 顯示勝利彈窗
+        function showWinPopup(winner) {
+            const popup = document.getElementById('win-popup');
+            document.getElementById('win-text').textContent = `${winner === 'black' ? '黑' : '白'}方獲勝！`;
+            popup.style.display = 'block';
+
+            document.getElementById('restart-btn-popup').onclick = () => {
+                restartGame();
+                popup.style.display = 'none';
+            };
+
+            document.getElementById('back-to-games-btn').onclick = () => {
+                window.location.href = 'litle.html'; // 改成你的小遊戲首頁
+            };
+        }
+
+        // 重置遊戲
+        function restartGame() {
+            board = Array(boardSize).fill().map(() => Array(boardSize).fill(null));
+            currentPlayer = 'black';
+            document.getElementById('current-player').textContent = '黑';
+            renderBoard();
+        }
+
+        createBoard(); // 初始化棋盤
+    </script>
+</body>
+</html>
